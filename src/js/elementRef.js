@@ -1,0 +1,15 @@
+export const elementRef ={
+    messageCardElement : document.getElementById('messages-card'),
+    messageListElement : document.getElementById('messages'),
+    messageFormElement : document.getElementById('message-form'),
+    messageInputElement : document.getElementById('message'),
+    submitButtonElement : document.getElementById('submit'),
+    imageButtonElement : document.getElementById('submitImage'),
+    imageFormElement : document.getElementById('image-form'),
+    mediaCaptureElement : document.getElementById('mediaCapture'),
+    userPicElement : document.getElementById('user-pic'),
+    userNameElement : document.getElementById('user-name'),
+    signInButtonElement : document.getElementById('sign-in'),
+    signOutButtonElement : document.getElementById('sign-out'),
+    signInSnackbarElement : document.getElementById('must-signin-snackbar'),
+}

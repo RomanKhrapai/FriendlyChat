@@ -1,5 +1,4 @@
-// TODO: Set up Firebase Cloud Messaging service worker
-// Import and configure the Firebase SDK
+
 import { initializeApp } from 'firebase/app';
 import { getMessaging } from 'firebase/messaging/sw';
 import { getFirebaseConfig } from './firebase-config';
