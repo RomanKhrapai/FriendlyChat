@@ -2,7 +2,7 @@
 'use strict';
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, 
+  getAuth,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -123,7 +123,7 @@ file = event.dataTransfer.files[0];
   }else{
     file = event.target.files[0];
   }
- console.log(file.type)
+
   // Clear the selection in the file picker input.
   elementRef.imageFormElement.reset();
  
