@@ -16,6 +16,7 @@
 
  html, body {
   font-family: 'Roboto', 'Helvetica', sans-serif;
+  background-color: aqua;
 }
 main, #messages-card {
   height: 100%;
@@ -57,14 +58,10 @@ main, #messages-card {
   height: calc(100% - 80px);
   display: flex;
   flex-direction: column;
+  background-color: #0288D1;
 }
-#message-filler {
-  flex-grow: 1;
-}
-.message-container:first-of-type {
-  border-top-width: 0;
-}
-.message-container {
+
+.message {
   display: block;
   margin-top: 10px;
   border-top: 1px solid #f3f3f3;
@@ -72,10 +69,20 @@ main, #messages-card {
   opacity: 0;
   transition: opacity 1s ease-in-out;
 }
-.message-container.visible {
+
+.message.visible {
   opacity: 1;
 }
-.message-container .pic {
+
+#message-filler {
+  flex-grow: 1;
+}
+.message:first-of-type {
+  border-top-width: 0;
+}
+
+
+.message__user-pic {
   background-image: url('/images/profile_placeholder.png');
   background-repeat: no-repeat;
   width: 30px;
@@ -83,19 +90,19 @@ main, #messages-card {
   background-size: 30px;
   border-radius: 20px;
 }
-.message-container .spacing {
+.message__date {
   display: table-cell;
   vertical-align: top;
 }
-.message-container .message {
+.message__text {
   display: table-cell;
   width: calc(100% - 40px);
   padding: 5px 0 5px 10px;
 }
-.message-container .name {
+.message__user-name {
   display: inline-block;
   width: 100%;
-  padding-left: 40px;
+  padding-left: 10px;
   color: #bbb;
   font-style: italic;
   font-size: 12px;
@@ -115,6 +122,7 @@ main, #messages-card {
 }
 #message-form .mdl-textfield {
   width: calc(100% - 100px);
+  background-color: #0288D1;
 }
 #message-form button, #image-form button {
   width: 100px;

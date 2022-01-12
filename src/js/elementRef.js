@@ -6,6 +6,7 @@ export const elementRef ={
     submitButtonElement : document.getElementById('submit'),
     imageButtonElement : document.getElementById('submitImage'),
     imageFormElement : document.getElementById('image-form'),
+    preShowFiles : document.getElementById('show-files'),
     mediaCaptureElement : document.getElementById('mediaCapture'),
     userPicElement : document.getElementById('user-pic'),
     userNameElement : document.getElementById('user-name'),

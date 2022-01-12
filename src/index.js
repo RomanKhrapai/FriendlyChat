@@ -29,141 +29,133 @@ import {elementRef} from "./js/elementRef";
 import {addSizeToGoogleProfilePic} from "./js/shiftData";
 
 
-// Saves a new message on the Cloud Firestore.
+const FILES = [];
+const LOADING_IMAGE_URL = 'https://www.google.com/images/spin-32.gif?a';
+const IMAGE_FILE_URL = 'https://www.gstatic.com/images/branding/product/1x/docs_2020q4_48dp.png?a'
+
+
 async function saveMessage(messageText) {
   try {
-    await addDoc(collection(getFirestore(), 'messages'), {
+    const messageRef = await addDoc(collection(getFirestore(), 'messages'), {
       name: getUserName(),
       text: messageText,
+      imageUrl: LOADING_IMAGE_URL,
       profilePicUrl: getProfilePicUrl(),
       timestamp: serverTimestamp()
     });
+    if(FILES.length){
+      const files = [];
+
+      for(const file of FILES){
+        const filePath = `${getAuth().currentUser.uid}/${messageRef.id}/${file.name}`;
+        const newImageRef = ref(getStorage(), filePath);
+        const fileSnapshot = await uploadBytesResumable(newImageRef,file);
+        const publicImageUrl = await getDownloadURL(newImageRef);
+    
+        files.push({
+          name:file.name,
+          type:file.type,
+          size:file.size,
+          snapshot:fileSnapshot.metadata.fullPath,
+          imageUrl:publicImageUrl
+        });
+      }
+        await updateDoc(messageRef,{  files,});
+    }
   }
   catch(error) {
     console.error('Error writing new message to Firebase Database', error);
   }
 }
 
-// Loads chat messages history and listens for upcoming ones.
 function loadMessages() {
-  const recentMessagesQuery = query(collection(getFirestore(), 'messages'), orderBy('timestamp', 'desc'), limit(12));
-  
-  // Start listening to the query.
+  const recentMessagesQuery = query(collection(getFirestore(), 'messages'), 
+  orderBy('timestamp', 'desc'), limit(12));
+
   onSnapshot(recentMessagesQuery, function(snapshot) {
+    
     snapshot.docChanges().forEach(function(change) {
+   
       if (change.type === 'removed') {
         deleteMessage(change.doc.id);
       } else {
-        var message = change.doc.data();
+        const message = change.doc.data();
         displayMessage(change.doc.id, message.timestamp, message.name,
-                      message.text, message.profilePicUrl, message.imageUrl,message.fileUrl,message.fileName);
+                      message.text, message.profilePicUrl, message.imageUrl,message.files);
       }
     });
   });
 }
 
+function displaySelectedFile(imageUrl,name,size){
+  const item = document.createElement('LI');
+  item.setAttribute('class', "message-files__item");
+item.innerHTML = `
+<img src="${imageUrl}" class="message-files__images" height="60px">
+<button type="button" class="message-files__cross">&#9932;</button>
+<h3 class="message-files__title">${name}</h3>
+<p class="message-files__data">${(size/1024).toFixed(1)} Kb</p>`
+  elementRef.preShowFiles.append(item);
 
-async function saveImageMessage(file) {
-  try {
-    const messageRef = await addDoc(collection(getFirestore(), 'messages'), {
-      name: getUserName(),
-      imageUrl: LOADING_IMAGE_URL,
-      profilePicUrl: getProfilePicUrl(),
-      timestamp: serverTimestamp()
-    });
-
-    const filePath = `${getAuth().currentUser.uid}/${messageRef.id}/${file.name}`;
-    const newImageRef = ref(getStorage(), filePath);
-    const fileSnapshot = await uploadBytesResumable(newImageRef, file);
-    
-    const publicImageUrl = await getDownloadURL(newImageRef);
-
-    await updateDoc(messageRef,{
-      imageUrl: publicImageUrl,
-      storageUri: fileSnapshot.metadata.fullPath
-    });
-  } catch (error) {
-    console.error('There was an error uploading a image to Cloud Storage:', error);
-  }
+  toggleButton();
 }
 
-async function savefileMessage(file) {
- 
-  try {
-    const messageRef = await addDoc(collection(getFirestore(), 'messages'), {
-      name: getUserName(),
-      imageUrl: LOADING_FILE_URL,
-      profilePicUrl: getProfilePicUrl(),
-      timestamp: serverTimestamp()
-    });
-    
-    const filePath = `${getAuth().currentUser.uid}/${messageRef.id}/${file.name}`;
-    const newFileRef = ref(getStorage(), filePath);
-    const fileSnapshot = await uploadBytesResumable(newFileRef, file);
-    
-    const publicFileUrl = await getDownloadURL(newFileRef);
-    
-    await updateDoc(messageRef,{
-      fileName:file.name,
-      fileUrl: publicFileUrl,
-      storageUri: fileSnapshot.metadata.fullPath
-    });
-  } catch (error) {
-    console.error('There was an error uploading a file to Cloud Storage:', error);
+function removeFileSelected(event){
+  if (event.target.nodeName !== "BUTTON") {
+    return;
   }
+const indexFile = FILES.findIndex(element => 
+   element.name === event.target.nextElementSibling.textContent);
+ FILES.splice(indexFile, 1);
+removeElement(event.path[1]);
 }
 
-// Triggered when a file is selected via the media picker.
-function onMediaFileSelected(event) {
+function removeElement(element){
+  element.remove();
+  toggleButton();
+}
+
+function addFiles(arrayFiles){  
+   [...arrayFiles].map((element, index, array) => {
+    if(element.type.match('image.*')){
+     makeUrlImage(element);
+    }else{
+      displaySelectedFile(IMAGE_FILE_URL,element.name,element.size)
+    }});
+      FILES.push(...arrayFiles);
+}
+
+function makeUrlImage(file) {
+  const fileReader = new FileReader();
+ fileReader.onload = function (event) {
+    const imageDataUrl = event.srcElement.result;  
+    displaySelectedFile(imageDataUrl,file.name,file.size);
+    }
+ fileReader.readAsDataURL(file);   
+}
+
+ function onMediaFileSelected(event) {
   event.preventDefault();
-
-  let file = null;
-  if(event.type==='drop'){
-file = event.dataTransfer.files[0];
-  }else{
-    file = event.target.files[0];
-  }
-
-  // Clear the selection in the file picker input.
-  elementRef.imageFormElement.reset();
- 
-  // if (!file.type.match('image.*')) {
-  //   var data = {
-  //     message: 'You can only share images',
-  //     timeout: 2000,
-  //   };
-  //   signInSnackbarElement.MaterialSnackbar.showSnackbar(data);
-  //   return;
-  // }
-
-  if (checkSignedInWithMessage()&&file.type.match('image.*')) {
-    saveImageMessage(file);
-  }else{
-    savefileMessage(file);
-  }
+  addFiles((event.dataTransfer||event.target).files);
+ elementRef.imageFormElement.reset();
 }
 
-// Triggered when the send new message form is submitted.
 function onMessageFormSubmit(e) {
   e.preventDefault();
-  // Check that the user entered a message and is signed in.
-  if (elementRef.messageInputElement.value.trim() && checkSignedInWithMessage()) {
+ 
+  if (elementRef.messageInputElement.value.trim() || FILES.length  && checkSignedInWithMessage()) {
     saveMessage(elementRef.messageInputElement.value).then(function () {
-      // Clear message text field and re-enable the SEND button.
       resetMaterialTextfield(elementRef.messageInputElement);
+      resetSelectFile();
       toggleButton();
     });
   }
 }
 
-// Returns true if user is signed-in. Otherwise false and displays a message.
 function checkSignedInWithMessage() {
-  // Return true if the user is signed in Firebase
   if (isUserSignedIn()) {
     return true;
   }
-
-  // Display a message to the user using a Toast.
   var data = {
     message: 'You must sign-in first',
     timeout: 2000,
@@ -172,25 +164,16 @@ function checkSignedInWithMessage() {
   return false;
 }
 
-// Resets the given MaterialTextField.
 function resetMaterialTextfield(element) {
   element.value = '';
   element.parentNode.MaterialTextfield.boundUpdateClassesHandler();
 }
 
-// Template for messages.
-var MESSAGE_TEMPLATE =
-  '<div class="message-container">' +
-  '<div class="spacing"><div class="pic"></div></div>' +
-  '<div class="message"></div>' +
-  '<div class="name"></div>' +
-  '</div>';
+function resetSelectFile(){
+  elementRef.preShowFiles.innerHTML= "";
+  FILES.splice(0,FILES.length);
+}
 
-// A loading image URL.
-var LOADING_IMAGE_URL = 'https://www.google.com/images/spin-32.gif?a';
-var LOADING_FILE_URL = 'https://www.gstatic.com/images/branding/product/1x/docs_2020q4_48dp.png?a'
-
-// Delete a Message from the UI.
 function deleteMessage(id) {
   var div = document.getElementById(id);
   // If an element for that message exists we delete it.
@@ -200,20 +183,31 @@ function deleteMessage(id) {
 }
 
 function createAndInsertMessage(id, timestamp) {
-  const container = document.createElement('div');
+  
+const MESSAGE_TEMPLATE =
+'<li class="message">' +
+'<div class="message__user-pic"></div>' +
+'<div class="message__date">'+
+    '<div class="message__user-name"></div>'+
+    '<div class="message__time"></div>'+
+'</div>' +
+'<div class="message__text"></div>' +
+'</li>';
+
+  const container = document.createElement('LI');
   container.innerHTML = MESSAGE_TEMPLATE;
-  const div = container.firstChild;
-  div.setAttribute('id', id);
+  const item = container.firstChild;
+  item.setAttribute('id', id);
 
   // If timestamp is null, assume we've gotten a brand new message.
   // https://stackoverflow.com/a/47781432/4816918
   timestamp = timestamp ? timestamp.toMillis() : Date.now();
-  div.setAttribute('timestamp', timestamp);
+  item.setAttribute('timestamp', timestamp);
 
   // figure out where to insert new message
   const existingMessages = elementRef.messageListElement.children;
   if (existingMessages.length === 0) {
-    elementRef.messageListElement.appendChild(div);
+    elementRef.messageListElement.appendChild(item);
   } else {
     let messageListNode = existingMessages[0];
 
@@ -225,76 +219,45 @@ function createAndInsertMessage(id, timestamp) {
           `Child ${messageListNode.id} has no 'timestamp' attribute`
         );
       }
-
       if (messageListNodeTime > timestamp) {
         break;
       }
-
       messageListNode = messageListNode.nextSibling;
     }
-
-    elementRef.messageListElement.insertBefore(div, messageListNode);
+    elementRef.messageListElement.insertBefore(item, messageListNode);
   }
-
-  return div;
+  return item;
 }
 
 // Displays a Message in the UI.
 function displayMessage(id, timestamp, name, text, picUrl, imageUrl,fileUrl,fileName) {
-  var div =
+  let message = null;
+  const item =
     document.getElementById(id) || createAndInsertMessage(id, timestamp);
 
-  // profile picture
   if (picUrl) {
-    div.querySelector('.pic').style.backgroundImage =
+    item.querySelector('.message__user-pic').style.backgroundImage =
       'url(' + addSizeToGoogleProfilePic(picUrl) + ')';
   }
-
-  div.querySelector('.name').textContent = name;
-  var messageElement = div.querySelector('.message');
+  item.querySelector('.message__user-name').textContent = name;
+  var messageElement = item.querySelector('.message__text');
 
   if (text) {
-    // If the message is text.
-    messageElement.textContent = text;
-    // Replace all line breaks by <br>.
-    messageElement.innerHTML = messageElement.innerHTML.replace(/\n/g, '<br>');
-  } else if(fileUrl){ 
-    const file = `
-    
-    ${fileName}
-    `;
-    var image = document.createElement('img');
-    image.addEventListener('load', function () {
-      elementRef.messageListElement.scrollTop = elementRef.messageListElement.scrollHeight;
-    });
-    image.src = imageUrl;
-    messageElement.innerHTML = '';
-    const textP = document.createElement('p');
-     textP.textContent = fileName;
-    // messageElement.innerHTML = messageElement.innerHTML.replace(/\n/g, '<br>');
-    messageElement.append(image,textP);
-  }else if (imageUrl) {
-    // If the message is an image.
-    var image = document.createElement('img');
-    image.addEventListener('load', function () {
-      elementRef.messageListElement.scrollTop = elementRef.messageListElement.scrollHeight;
-    });
-    image.src = imageUrl + '&' + new Date().getTime();
-    messageElement.innerHTML = '';
-    messageElement.appendChild(image);
-  } 
-  // Show the card fading-in and scroll to view the new message.
-  setTimeout(function () {
-    div.classList.add('visible');
-  }, 1);
-  elementRef.messageListElement.scrollTop = elementRef.messageListElement.scrollHeight;
+    message = text.replace(/\n/g, '<br>'); 
+  } else if(files){ 
+    message = `<img src="${imageUrl}"><p>${fileName}</p><a href="${fileUrl}" download>download</a>`; 
+  }
+  if(message){ messageElement.innerHTML = message; }
+ 
+  item.classList.add('visible');
+
+  elementRef.messageListElement.scrollTop = elementRef.messageListElement.scrollHeight+100;
   elementRef.messageInputElement.focus();
 }
 
-// Enables or disables the submit button depending on the values of the input
-// fields.
 function toggleButton() {
-  if (elementRef.messageInputElement.value) {
+  if (elementRef.messageInputElement.value||
+    elementRef.preShowFiles.children.length) {
     elementRef.submitButtonElement.removeAttribute('disabled');
   } else {
     elementRef.submitButtonElement.setAttribute('disabled', 'true');
@@ -314,14 +277,19 @@ elementRef.messageInputElement.addEventListener('change', toggleButton);
 elementRef.messageCardElement.addEventListener("dragover",(e)=>{
      e.preventDefault();
 }, false);
-
 elementRef.messageCardElement.addEventListener("drop",onMediaFileSelected);
-
 elementRef.imageButtonElement.addEventListener('click', function (e) {
   e.preventDefault();
   elementRef.mediaCaptureElement.click();
 });
 elementRef.mediaCaptureElement.addEventListener('change', onMediaFileSelected);
+elementRef.messageCardElement.addEventListener("drop",(e)=>{
+  e.preventDefault();
+});
+
+elementRef.preShowFiles.addEventListener('click',removeFileSelected);
+
+
 
 const firebaseAppConfig = getFirebaseConfig();
 
@@ -331,5 +299,41 @@ getPerformance();
 
 initFirebaseAuth();
 loadMessages();
+//--------------------------------------
+runOnKeys(
+  read,
+  "KeyV",
+  "ControlLeft",
+  "ControlRight",
+);
 
+function read (){
+  navigator.clipboard.read().then(( items ) => {
+    console.log(navigator.clipboard);
+    // items.forEach(item => {
+    //   console.log(item.type);
+    //   // делаем что-то с полученными данными
+    // });
+  });
+}
+function runOnKeys(func,code, ...codes) {
+  let pressed = new Set();
+  document.addEventListener('keydown', function(event) {
+    pressed.add(event.code);
+if(pressed.has(code)){
+  for (let code of codes) { 
+      if (pressed.has(code)) {
+       pressed.clear();
+    func(); 
+      }
+    }}
+  });
+  document.addEventListener('keyup', function(event) {
+    pressed.delete(event.code);
+  });
+}
+///----------------------------------
+
+
+ 
 
